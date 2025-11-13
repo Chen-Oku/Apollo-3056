@@ -10,6 +10,8 @@ public class PoolManager : MonoBehaviour
     {
         public string tag;
         public GameObject prefab;
+        [Tooltip("If you want multiple models under the same tag, add them here. The single 'prefab' field is kept for backward compatibility.")]
+        public List<GameObject> prefabs;
         public int size = 10;
     }
 
@@ -28,12 +30,42 @@ public class PoolManager : MonoBehaviour
 
         poolDictionary = new Dictionary<string, Queue<GameObject>>();
 
-        foreach (var pool in pools)
+    foreach (var pool in pools)
         {
+            // Basic validation
+            if (string.IsNullOrEmpty(pool.tag))
+            {
+                Debug.LogWarning("PoolManager: encountered a pool with empty tag - skipping.");
+                continue;
+            }
+
+            // Collect available prefabs for this pool (support both legacy single prefab and new list)
+            var availablePrefabs = new List<GameObject>();
+            if (pool.prefab != null) availablePrefabs.Add(pool.prefab);
+            if (pool.prefabs != null)
+            {
+                foreach (var p in pool.prefabs)
+                    if (p != null) availablePrefabs.Add(p);
+            }
+
+            if (availablePrefabs.Count == 0)
+            {
+                Debug.LogWarning($"PoolManager: no prefabs assigned for pool '{pool.tag}' - skipping.");
+                continue;
+            }
+
+            if (poolDictionary.ContainsKey(pool.tag))
+            {
+                Debug.LogWarning($"PoolManager: duplicate pool tag '{pool.tag}' found - skipping duplicate.");
+                continue;
+            }
+
             var objectQueue = new Queue<GameObject>();
             for (int i = 0; i < Mathf.Max(1, pool.size); i++)
             {
-                var obj = Instantiate(pool.prefab);
+                // Pick a prefab among available (randomize variety)
+                var prefabToUse = availablePrefabs[Random.Range(0, availablePrefabs.Count)];
+                var obj = Instantiate(prefabToUse, transform);
                 obj.SetActive(false);
                 objectQueue.Enqueue(obj);
             }
@@ -41,7 +73,9 @@ public class PoolManager : MonoBehaviour
         }
     }
 
-    public GameObject SpawnFromPool(string tag, Vector3 position, Quaternion rotation)
+    // Optional speedMultiplier is applied to a Mover component (if present) BEFORE the object is activated,
+    // so that OnObjectSpawn/OnEnable see the updated speed.
+    public GameObject SpawnFromPool(string tag, Vector3 position, Quaternion rotation, float speedMultiplier = 1f)
     {
         if (!poolDictionary.ContainsKey(tag))
         {
@@ -69,14 +103,37 @@ public class PoolManager : MonoBehaviour
         // If none available, instantiate a new one and add to the queue
         if (objectToSpawn == null)
         {
-            var prefab = pools.Find(p => p.tag == tag)?.prefab;
-            if (prefab == null)
+            // Find pool entry and pick a random prefab from its available prefabs
+            var poolEntry = pools.Find(p => p.tag == tag);
+            if (poolEntry == null)
+            {
+                Debug.LogWarning($"Pool entry for tag '{tag}' not found");
+                return null;
+            }
+
+            var availablePrefabs = new List<GameObject>();
+            if (poolEntry.prefab != null) availablePrefabs.Add(poolEntry.prefab);
+            if (poolEntry.prefabs != null)
+            {
+                foreach (var p in poolEntry.prefabs) if (p != null) availablePrefabs.Add(p);
+            }
+
+            if (availablePrefabs.Count == 0)
             {
                 Debug.LogWarning($"Prefab for pool '{tag}' not found");
                 return null;
             }
-            objectToSpawn = Instantiate(prefab);
+
+            var prefabToInstantiate = availablePrefabs[Random.Range(0, availablePrefabs.Count)];
+            objectToSpawn = Instantiate(prefabToInstantiate, transform);
             queue.Enqueue(objectToSpawn);
+        }
+
+        // Apply speed multiplier to Mover (if present) BEFORE activation so OnObjectSpawn/OnEnable use it
+        var mover = objectToSpawn.GetComponent<Mover>();
+        if (mover != null)
+        {
+            mover.SetSpeedMultiplier(speedMultiplier);
         }
 
         objectToSpawn.transform.position = position;
@@ -100,10 +157,31 @@ public class PoolManager : MonoBehaviour
         var rb = obj.GetComponent<Rigidbody>();
         if (rb != null)
         {
+            // Use standard Rigidbody API
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
         }
 
         obj.SetActive(false);
+    }
+
+    /// <summary>
+    /// Returns true if a pool with the given tag exists.
+    /// </summary>
+    public bool HasPool(string tag)
+    {
+        if (string.IsNullOrEmpty(tag)) return false;
+        return poolDictionary != null && poolDictionary.ContainsKey(tag);
+    }
+
+    /// <summary>
+    /// Returns all pool tags currently registered.
+    /// </summary>
+    public string[] GetAllPoolTags()
+    {
+        if (poolDictionary == null) return new string[0];
+        var keys = new string[poolDictionary.Count];
+        poolDictionary.Keys.CopyTo(keys, 0);
+        return keys;
     }
 }

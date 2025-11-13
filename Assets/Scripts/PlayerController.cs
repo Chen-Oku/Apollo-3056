@@ -35,6 +35,10 @@ public class PlayerController : MonoBehaviour
     // Clase generada por el Input System (archivo InputSystem_Actions.cs)
     private InputSystem_Actions controls;
 
+    [Header("Mobile")]
+    [Tooltip("Si se asigna, el PlayerController usará este joystick en pantalla en lugar del Input System (útil en móviles)")]
+    public OnScreenJoystick mobileJoystick;
+
     void Awake()
     {
         // Cacheamos componentes si están presentes
@@ -51,7 +55,7 @@ public class PlayerController : MonoBehaviour
 
     void OnEnable()
     {
-        controls?.Player.Enable();
+            controls?.Player.Enable();
     }
 
     void OnDisable()
@@ -77,8 +81,11 @@ public class PlayerController : MonoBehaviour
     // FixedUpdate para movimiento físico estable
     void FixedUpdate()
     {
-        // Calculamos movimiento en 2D (input) y lo escalamos por velocidad/tiempo físico
-        Vector2 movement2D = moveInput * moveSpeed * Time.fixedDeltaTime;
+    // Decidir qué entrada usar: joystick móvil si está asignado, si no usar Input System
+    Vector2 inputToUse = (mobileJoystick != null) ? mobileJoystick.Direction : moveInput;
+
+    // Calculamos movimiento en 2D (input) y lo escalamos por velocidad/tiempo físico
+    Vector2 movement2D = inputToUse * moveSpeed * Time.fixedDeltaTime;
 
         // ----- Caso Rigidbody2D -----
         if (rb2d != null)
@@ -96,7 +103,7 @@ public class PlayerController : MonoBehaviour
 
             rb2d.MovePosition(newPos);
             // Rotación/tilt en 2D (rotación alrededor del eje Z)
-            float targetAngle2D = -moveInput.x * maxTilt; // signo para que la nave incline hacia la dirección del movimiento
+            float targetAngle2D = -inputToUse.x * maxTilt; // signo para que la nave incline hacia la dirección del movimiento
             float newAngle = Mathf.LerpAngle(rb2d.rotation, targetAngle2D, tiltSpeed * Time.fixedDeltaTime);
             rb2d.MoveRotation(newAngle);
             return;
@@ -117,14 +124,14 @@ public class PlayerController : MonoBehaviour
 
             rb3d.MovePosition(target);
             // Rotación/tilt en 3D (roll alrededor del eje Z)
-            Quaternion targetRot3D = Quaternion.Euler(transform.eulerAngles.x, 0f, -moveInput.x * maxTilt);
+            Quaternion targetRot3D = Quaternion.Euler(transform.eulerAngles.x, 0f, -inputToUse.x * maxTilt);
             Quaternion slerped = Quaternion.Slerp(rb3d.rotation, targetRot3D, tiltSpeed * Time.fixedDeltaTime);
             rb3d.MoveRotation(slerped);
             return;
         }
 
         // ----- Fallback: Transform -----
-        Vector3 fallbackMove = new Vector3(movement2D.x, 0f, movement2D.y);
+    Vector3 fallbackMove = new Vector3(movement2D.x, 0f, movement2D.y);
         transform.Translate(fallbackMove, Space.Self);
 
         // Limitar la posición del Transform si hay límites definidos
@@ -137,7 +144,7 @@ public class PlayerController : MonoBehaviour
         }
 
         // Rotación/tilt para fallback Transform
-        Quaternion targetRotFallback = Quaternion.Euler(0f, 0f, -moveInput.x * maxTilt);
+        Quaternion targetRotFallback = Quaternion.Euler(0f, 0f, -inputToUse.x * maxTilt);
         transform.rotation = Quaternion.Slerp(transform.rotation, targetRotFallback, tiltSpeed * Time.fixedDeltaTime);
     }
 

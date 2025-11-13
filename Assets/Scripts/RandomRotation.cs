@@ -1,27 +1,41 @@
 using UnityEngine;
 
-public class RandomRotation : MonoBehaviour
+/// <summary>
+/// Applies a random angular velocity when spawned. Implements IPooledObject so it works with PoolManager reuse.
+/// </summary>
+public class RandomRotation : MonoBehaviour, IPooledObject
 {
-
     private Rigidbody rb;
-    public float tumble;
+    [Tooltip("Maximum angular magnitude applied as initial tumble")]
+    public float tumble = 1f;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
     }
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    void OnEnable()
     {
-        // Generar una dirección aleatoria normalizada y aplicarle una magnitud aleatoria
+        // Ensure rotation applied when enabled (covers non-pooled activation)
+        ApplyRandomAngularVelocity();
+    }
+
+    void ApplyRandomAngularVelocity()
+    {
+        if (rb == null) return;
         Vector3 angularVelocity = Random.insideUnitSphere * tumble;
         rb.angularVelocity = angularVelocity;
     }
 
-    // Update is called once per frame
-    void Update()
+    // IPooledObject
+    public void OnObjectSpawn()
     {
-        
+        ApplyRandomAngularVelocity();
+    }
+
+    public void OnObjectReturn()
+    {
+        if (rb != null)
+            rb.angularVelocity = Vector3.zero;
     }
 }
