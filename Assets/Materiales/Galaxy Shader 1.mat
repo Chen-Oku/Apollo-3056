@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Shader Graphs_New Shader Graph
+  m_Name: Galaxy Shader 1
   m_Shader: {fileID: -6465566751694194690, guid: 7834ca2db6cc58343ada7df170bb8972, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -42,13 +42,13 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Alfa: 0.7
+    - _Alfa: 0.6
     - _QueueControl: 0
     - _QueueOffset: 0
     - _XRMotionVectorsPass: 1
     m_Colors:
     - _Emisivo: {r: 0, g: 0, b: 0, a: 1}
-    - _ScrollSpeed: {r: 0, g: 0.05, b: 0, a: 0}
+    - _ScrollSpeed: {r: 0.02, g: 0.04, b: 0, a: 0}
     - _Vector2: {r: 0, g: 0.1, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
