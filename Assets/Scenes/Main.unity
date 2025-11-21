@@ -1128,8 +1128,8 @@ RectTransform:
   m_GameObject: {fileID: 575405457}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 1
+  m_LocalScale: {x: 2.5, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 346595369}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -7202,7 +7202,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 40483421cdfccd348a5ce27b270e3a59, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerController
-  moveSpeed: 10
+  moveSpeed: 30
   boundary:
     xMin: -10
     xMax: 10
@@ -7210,6 +7210,8 @@ MonoBehaviour:
     zMax: 15
   maxTilt: 25
   tiltSpeed: 8
+  useVelocityMovement: 1
+  instantTilt: 0
   mobileJoystick: {fileID: 591406247}
 --- !u!54 &1091079430
 Rigidbody:
@@ -12313,7 +12315,7 @@ RectTransform:
   m_GameObject: {fileID: 1583672650}
   m_LocalRotation: {x: 0.000000014420493, y: 0.00000008940697, z: -1, w: 0.00000051944426}
   m_LocalPosition: {x: 0, y: 0, z: -0}
-  m_LocalScale: {x: -2.5, y: 3, z: 1}
+  m_LocalScale: {x: 2.5, y: 3, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 346595369}

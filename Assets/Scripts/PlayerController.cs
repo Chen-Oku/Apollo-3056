@@ -25,6 +25,11 @@ public class PlayerController : MonoBehaviour
     [Tooltip("Rapidez con la que la nave interpola hacia la inclinación objetivo")]
     public float tiltSpeed = 8f;
 
+    [Header("Responsiveness")]
+    [Tooltip("Use Rigidbody.velocity instead of MovePosition for more immediate movement (reduces feel of input lag)")]
+    public bool useVelocityMovement = true;
+    [Tooltip("If true, the ship will instantly adopt the tilt angle instead of interpolating (snappier feel)")]
+    public bool instantTilt = false;
     // Componentes opcionales: preferimos Rigidbody2D para un juego tipo top-down 2D.
     Rigidbody2D rb2d;
     Rigidbody rb3d;
@@ -78,18 +83,98 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    void Update()
+    {
+        // Read joystick every frame for more immediate response on mobile/editor UI
+        if (mobileJoystick != null)
+        {
+            moveInput = mobileJoystick.Direction;
+        }
+
+        // If there is no Rigidbody, move the Transform here for more responsive feedback
+        if (rb2d == null && rb3d == null)
+        {
+            Vector3 movement = new Vector3(moveInput.x, 0f, moveInput.y) * moveSpeed * Time.deltaTime;
+            transform.Translate(movement, Space.Self);
+
+            if (boundary != null)
+            {
+                Vector3 p = transform.position;
+                p.x = Mathf.Clamp(p.x, boundary.xMin, boundary.xMax);
+                p.z = Mathf.Clamp(p.z, boundary.zMin, boundary.zMax);
+                transform.position = p;
+            }
+
+            // Tilt (instant or interpolated)
+            Quaternion targetRotFallback = Quaternion.Euler(0f, 0f, -moveInput.x * maxTilt);
+            if (instantTilt)
+                transform.rotation = targetRotFallback;
+            else
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotFallback, tiltSpeed * Time.deltaTime);
+        }
+    }
     // FixedUpdate para movimiento físico estable
     void FixedUpdate()
     {
-    // Decidir qué entrada usar: joystick móvil si está asignado, si no usar Input System
-    Vector2 inputToUse = (mobileJoystick != null) ? mobileJoystick.Direction : moveInput;
+        // Use the latest sampled input (Update or InputSystem callbacks)
+        Vector2 inputToUse = moveInput;
 
-    // Calculamos movimiento en 2D (input) y lo escalamos por velocidad/tiempo físico
-    Vector2 movement2D = inputToUse * moveSpeed * Time.fixedDeltaTime;
+        // Calculamos movimiento en 2D (input) y lo escalamos por velocidad/tiempo físico
+        Vector2 movement2D = inputToUse * moveSpeed * Time.fixedDeltaTime;
 
         // ----- Caso Rigidbody2D -----
         if (rb2d != null)
         {
+            // Calcular ángulo objetivo una sola vez para evitar declaraciones duplicadas
+            float targetAngle2D = -inputToUse.x * maxTilt;
+            float appliedAngle2D = 0f;
+
+            if (useVelocityMovement)
+            {
+                Vector2 desiredVel = inputToUse * moveSpeed;
+
+                // Si el Rigidbody2D es dinámico, podemos asignar velocity. Si es kinematic, usar MovePosition.
+                if (rb2d.bodyType == RigidbodyType2D.Dynamic)
+                {
+                    rb2d.linearVelocity = desiredVel;
+
+                    if (boundary != null)
+                    {
+                        Vector2 projected = rb2d.position + desiredVel * Time.fixedDeltaTime;
+                        projected.x = Mathf.Clamp(projected.x, boundary.xMin, boundary.xMax);
+                        projected.y = Mathf.Clamp(projected.y, boundary.zMin, boundary.zMax);
+                        // Si proyectado fue clamped, forzamos la posición y anulamos velocidad
+                        if (projected.x != rb2d.position.x || projected.y != rb2d.position.y)
+                        {
+                            rb2d.position = projected;
+                            rb2d.linearVelocity = Vector2.zero;
+                        }
+                    }
+                }
+                else
+                {
+                    // Kinematic body: aplicar por MovePosition para respetar su modo
+                    Vector2 newPosK = rb2d.position + movement2D;
+                    if (boundary != null)
+                    {
+                        float clampedX = Mathf.Clamp(newPosK.x, boundary.xMin, boundary.xMax);
+                        float clampedY = Mathf.Clamp(newPosK.y, boundary.zMin, boundary.zMax);
+                        newPosK = new Vector2(clampedX, clampedY);
+                    }
+                    rb2d.MovePosition(newPosK);
+                }
+
+                if (instantTilt)
+                    rb2d.MoveRotation(targetAngle2D);
+                else
+                {
+                    appliedAngle2D = Mathf.LerpAngle(rb2d.rotation, targetAngle2D, tiltSpeed * Time.fixedDeltaTime);
+                    rb2d.MoveRotation(appliedAngle2D);
+                }
+
+                return;
+            }
+
             Vector2 newPos = rb2d.position + movement2D;
 
             // Si se definieron límites, aplicarlos (mapeamos zMin/zMax a y en 2D si se desea)
@@ -103,15 +188,62 @@ public class PlayerController : MonoBehaviour
 
             rb2d.MovePosition(newPos);
             // Rotación/tilt en 2D (rotación alrededor del eje Z)
-            float targetAngle2D = -inputToUse.x * maxTilt; // signo para que la nave incline hacia la dirección del movimiento
-            float newAngle = Mathf.LerpAngle(rb2d.rotation, targetAngle2D, tiltSpeed * Time.fixedDeltaTime);
-            rb2d.MoveRotation(newAngle);
+            appliedAngle2D = Mathf.LerpAngle(rb2d.rotation, targetAngle2D, tiltSpeed * Time.fixedDeltaTime);
+            rb2d.MoveRotation(appliedAngle2D);
             return;
         }
 
         // ----- Caso Rigidbody 3D -----
         if (rb3d != null)
         {
+            // Calcular rotación objetivo una sola vez para evitar declaraciones duplicadas
+            Quaternion targetRot3D = Quaternion.Euler(transform.eulerAngles.x, 0f, -inputToUse.x * maxTilt);
+            Quaternion slerpedRot3D = Quaternion.identity;
+
+            if (useVelocityMovement)
+            {
+                Vector3 desiredVel = new Vector3(inputToUse.x * moveSpeed, rb3d.linearVelocity.y, inputToUse.y * moveSpeed);
+
+                if (!rb3d.isKinematic)
+                {
+                    rb3d.linearVelocity = desiredVel;
+
+                    if (boundary != null)
+                    {
+                        Vector3 projected = rb3d.position + new Vector3(desiredVel.x, 0f, desiredVel.z) * Time.fixedDeltaTime;
+                        projected.x = Mathf.Clamp(projected.x, boundary.xMin, boundary.xMax);
+                        projected.z = Mathf.Clamp(projected.z, boundary.zMin, boundary.zMax);
+                        if (projected.x != rb3d.position.x || projected.z != rb3d.position.z)
+                        {
+                            rb3d.position = projected;
+                            rb3d.linearVelocity = Vector3.zero;
+                        }
+                    }
+                }
+                else
+                {
+                    // Kinematic: usar MovePosition
+                    Vector3 movement3DK = new Vector3(movement2D.x, 0f, movement2D.y);
+                    Vector3 targetK = rb3d.position + movement3DK;
+                    if (boundary != null)
+                    {
+                        targetK.x = Mathf.Clamp(targetK.x, boundary.xMin, boundary.xMax);
+                        targetK.z = Mathf.Clamp(targetK.z, boundary.zMin, boundary.zMax);
+                    }
+                    rb3d.MovePosition(targetK);
+                }
+
+                if (instantTilt)
+                    rb3d.MoveRotation(targetRot3D);
+                else
+                {
+                    slerpedRot3D = Quaternion.Slerp(rb3d.rotation, targetRot3D, tiltSpeed * Time.fixedDeltaTime);
+                    rb3d.MoveRotation(slerpedRot3D);
+                }
+
+                return;
+            }
+
             Vector3 movement3D = new Vector3(movement2D.x, 0f, movement2D.y);
             Vector3 target = rb3d.position + movement3D;
 
@@ -124,9 +256,8 @@ public class PlayerController : MonoBehaviour
 
             rb3d.MovePosition(target);
             // Rotación/tilt en 3D (roll alrededor del eje Z)
-            Quaternion targetRot3D = Quaternion.Euler(transform.eulerAngles.x, 0f, -inputToUse.x * maxTilt);
-            Quaternion slerped = Quaternion.Slerp(rb3d.rotation, targetRot3D, tiltSpeed * Time.fixedDeltaTime);
-            rb3d.MoveRotation(slerped);
+            slerpedRot3D = Quaternion.Slerp(rb3d.rotation, targetRot3D, tiltSpeed * Time.fixedDeltaTime);
+            rb3d.MoveRotation(slerpedRot3D);
             return;
         }
 
