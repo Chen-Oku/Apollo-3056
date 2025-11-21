@@ -30,6 +30,13 @@ public class PlayerController : MonoBehaviour
     public bool useVelocityMovement = true;
     [Tooltip("If true, the ship will instantly adopt the tilt angle instead of interpolating (snappier feel)")]
     public bool instantTilt = false;
+    [Header("Auto Boundary")]
+    [Tooltip("If true, the boundary's X extents (width) will be updated to match the screen view; Z extents remain editable in the inspector.")]
+    public bool fitBoundaryToScreen = false;
+    [Tooltip("Camera used to compute world-space screen edges. If null, Camera.main will be used.")]
+    public Camera boundaryCamera;
+    [Tooltip("Optional inward padding (in world units) to apply after matching the screen bounds")]
+    public float boundaryPadding = 0f;
     // Componentes opcionales: preferimos Rigidbody2D para un juego tipo top-down 2D.
     Rigidbody2D rb2d;
     Rigidbody rb3d;
@@ -56,6 +63,31 @@ public class PlayerController : MonoBehaviour
         // Cuando la acción Move se realiza, guardamos el vector; cuando se cancela, lo ponemos a cero.
         controls.Player.Move.performed += ctx => moveInput = ctx.ReadValue<Vector2>();
         controls.Player.Move.canceled += ctx => moveInput = Vector2.zero;
+    }
+    // Check for resolution/screen size changes and update boundary if requested
+    void LateUpdate()
+    {
+        if (!fitBoundaryToScreen)
+            return;
+
+        if (Screen.width != lastScreenWidth || Screen.height != lastScreenHeight)
+        {
+            lastScreenWidth = Screen.width;
+            lastScreenHeight = Screen.height;
+            UpdateBoundaryToScreen();
+        }
+    }
+
+    int lastScreenWidth = 0;
+    int lastScreenHeight = 0;
+
+    void Start()
+    {
+        // Initialize screen-size cache and optionally fit the boundary at start
+        lastScreenWidth = Screen.width;
+        lastScreenHeight = Screen.height;
+        if (fitBoundaryToScreen)
+            UpdateBoundaryToScreen();
     }
 
     void OnEnable()
@@ -112,6 +144,8 @@ public class PlayerController : MonoBehaviour
             else
                 transform.rotation = Quaternion.Slerp(transform.rotation, targetRotFallback, tiltSpeed * Time.deltaTime);
         }
+
+        // (screen-size change handling moved to class-level LateUpdate)
     }
     // FixedUpdate para movimiento físico estable
     void FixedUpdate()
@@ -293,5 +327,48 @@ public class PlayerController : MonoBehaviour
         Vector3 size = new Vector3(Mathf.Abs(boundary.xMax - boundary.xMin), 0.1f, Mathf.Abs(boundary.zMax - boundary.zMin));
 
         Gizmos.DrawWireCube(center, size);
+    }
+
+    /// <summary>
+    /// Ajusta el `boundary` para que coincida con los bordes visibles de la cámara en el plano XZ.
+    /// Calcula los puntos del borde de pantalla en el plano horizontal cuya altura es la del jugador.
+    /// Funciona con cámaras ortográficas y con perspectiva.
+    /// </summary>
+    void UpdateBoundaryToScreen()
+    {
+        if (boundary == null)
+            return;
+
+        Camera cam = boundaryCamera != null ? boundaryCamera : Camera.main;
+        if (cam == null)
+            return;
+
+        // Plane horizontal (X-Z) at the player's Y position
+        float planeY = transform.position.y;
+        Plane plane = new Plane(Vector3.up, new Vector3(0f, planeY, 0f));
+
+        // Helper to raycast a screen point to the plane
+        System.Func<Vector3, Vector3> ScreenToPlane = (Vector3 screenPt) =>
+        {
+            Ray ray = cam.ScreenPointToRay(screenPt);
+            if (plane.Raycast(ray, out float enter))
+                return ray.GetPoint(enter);
+            // Fallback: return player's position if raycast fails
+            return transform.position;
+        };
+
+        // Horizontal extents (X): sample middle Y of the screen at left and right
+        Vector3 leftWorld = ScreenToPlane(new Vector3(0f, Screen.height * 0.5f, 0f));
+        Vector3 rightWorld = ScreenToPlane(new Vector3(Screen.width, Screen.height * 0.5f, 0f));
+
+        float xMin = Mathf.Min(leftWorld.x, rightWorld.x) + boundaryPadding;
+        float xMax = Mathf.Max(leftWorld.x, rightWorld.x) - boundaryPadding;
+
+        // Only assign X extents if they are valid. Z extents are left as configured in the inspector.
+        if (xMin < xMax)
+        {
+            boundary.xMin = xMin;
+            boundary.xMax = xMax;
+        }
     }
 }
