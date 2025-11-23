@@ -118,4 +118,10 @@ public class GameController : MonoBehaviour
     {
         scoreText.text = "Score: " + score;
     }
+
+    public void OnObstacleHit(GameObject other)
+    {
+        var near = GetComponent<NearMissDetector>();
+        if (near != null) near.MarkHit(other.gameObject);
+    }
 }
