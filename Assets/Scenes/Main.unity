@@ -132,7 +132,7 @@ GameObject:
   - component: {fileID: 97379095}
   - component: {fileID: 97379094}
   m_Layer: 5
-  m_Name: Canvas
+  m_Name: Canvas GUI
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -6867,8 +6867,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: 'Score:'
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 279eeb8f7121395458b713a0a9296ca8, type: 2}
-  m_sharedMaterial: {fileID: -8358595684814965719, guid: 279eeb8f7121395458b713a0a9296ca8, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 308cf24010a6163469f95eb064a0a732, type: 2}
+  m_sharedMaterial: {fileID: -8606564723296962584, guid: 308cf24010a6163469f95eb064a0a732, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -6943,7 +6943,7 @@ CanvasRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1024570498}
-  m_CullTransparentMesh: 1
+  m_CullTransparentMesh: 0
 --- !u!1 &1039989583
 GameObject:
   m_ObjectHideFlags: 0
@@ -7302,7 +7302,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 10907, guid: 0000000000000000f000000000000000, type: 0}
+  m_Sprite: {fileID: 0}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -7319,7 +7319,7 @@ CanvasRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1128520785}
-  m_CullTransparentMesh: 1
+  m_CullTransparentMesh: 0
 --- !u!1 &1350744374
 GameObject:
   m_ObjectHideFlags: 0
