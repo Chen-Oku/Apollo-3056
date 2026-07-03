@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 using TMPro;
 
 public class GameController : MonoBehaviour
@@ -34,13 +35,26 @@ public class GameController : MonoBehaviour
     private int score;
     public TextMeshProUGUI scoreText;
 
+    [Header("Game Over")]
+    public GameObject gameOverPanel;
+    public TextMeshProUGUI finalScoreText;
+    public TextMeshProUGUI bestScoreText;
+
+    const string BestScoreKey = "Apollo_BestScore";
+
+    bool _isGameOver;
+    Coroutine _spawnRoutine;
+
     // Runtime filtered list of valid pool tags (non-empty and registered in PoolManager)
     string[] _validObstacleTags;
 
     void Start()
     {
         score = 0;
+        _isGameOver = false;
         UpdateScore();
+        if (gameOverPanel != null) gameOverPanel.SetActive(false);
+
         // Filter configured tags against PoolManager to avoid empty or missing tags
         if (obstaclePoolTags != null && obstaclePoolTags.Length > 0 && PoolManager.Instance != null)
         {
@@ -54,13 +68,13 @@ public class GameController : MonoBehaviour
             _validObstacleTags = valid.ToArray();
         }
 
-        StartCoroutine(SpawnWaves());
+        _spawnRoutine = StartCoroutine(SpawnWaves());
     }
 
     IEnumerator SpawnWaves()
     {
         yield return new WaitForSeconds(startWait);
-        while (true)
+        while (!_isGameOver)
         {
             for (int i = 0; i < obstaculeCount; i++)
             {
@@ -110,18 +124,42 @@ public class GameController : MonoBehaviour
 
     public void AddScore(int value)
     {
+        if (_isGameOver) return;
+
         score += value;
         UpdateScore();
     }
-    
+
     void UpdateScore()
     {
         scoreText.text = "Score: " + score;
     }
 
-    public void OnObstacleHit(GameObject other)
+    public void GameOver()
     {
-        var near = GetComponent<NearMissDetector>();
-        if (near != null) near.MarkHit(other.gameObject);
+        if (_isGameOver) return;
+        _isGameOver = true;
+
+        if (_spawnRoutine != null) StopCoroutine(_spawnRoutine);
+
+        int bestScore = PlayerPrefs.GetInt(BestScoreKey, 0);
+        if (score > bestScore)
+        {
+            bestScore = score;
+            PlayerPrefs.SetInt(BestScoreKey, bestScore);
+            PlayerPrefs.Save();
+        }
+
+        if (finalScoreText != null) finalScoreText.text = "Puntaje: " + score;
+        if (bestScoreText != null) bestScoreText.text = "Mejor: " + bestScore;
+        if (gameOverPanel != null) gameOverPanel.SetActive(true);
+
+        Time.timeScale = 0f;
+    }
+
+    public void Restart()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }

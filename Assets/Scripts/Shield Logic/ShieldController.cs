@@ -34,6 +34,7 @@ public class ShieldController : MonoBehaviour
 
     public float CurrentCharge => _charge;
     public bool IsAvailable => !_isOnCooldown && !_isActive && _charge >= maxCharge - 1e-3f;
+    public float ShieldTimeRemaining { get; private set; }
 
     void Update()
     {
@@ -89,9 +90,11 @@ public class ShieldController : MonoBehaviour
         OnChargeChanged?.Invoke(_charge);
 
         float t = shieldDuration;
+        ShieldTimeRemaining = t;
         while (t > 0f)
         {
             t -= Time.deltaTime;
+            ShieldTimeRemaining = Mathf.Max(t, 0f);
             yield return null;
         }
 
